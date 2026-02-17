@@ -5,15 +5,15 @@ import urllib.request
 import numpy as np
 import keyboard
 import winsound
-import tkinter as tk  # Biblioteca de GUI nativa
+import tkinter as tk 
 
 # --- CONFIGURAÇÃO ---
-META_HORAS = 0.004         # Sua meta
+META_HORAS = 6.0         # Sua meta
 BUFFER_SEGURANCA = 5.0   # Tolerância
 INTERVALO_LOOP = 0.5     # Loop (s)
 CONFIANCA_MINIMA = 0.5   
 
-# --- PREPARAÇÃO DO AMBIENTE ---
+# --- PREPARAÇÃO ---
 DIRETORIO_BASE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(DIRETORIO_BASE)
 
@@ -21,7 +21,7 @@ ARQUIVO_PROTO = "deploy.prototxt"
 ARQUIVO_MODEL = "res10_300x300_ssd_iter_140000.caffemodel"
 META_SEGUNDOS = META_HORAS * 3600 
 
-# --- DOWNLOAD DE MODELOS ---
+# --- DOWNLOADER ---
 def verificar_modelos():
     arquivos = {
         ARQUIVO_PROTO: "https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/deploy.prototxt",
@@ -35,18 +35,23 @@ def verificar_modelos():
                 exit()
 verificar_modelos()
 
-# --- SETUP DA GUI (TKINTER) ---
-# Cria a janela, mas deixa ela escondida inicialmente
+# --- VARIÁVEIS DE CONTROLE GLOBAL ---
+aviso_meta_fechado = False  # Controla se você já clicou no X
+
+def fechar_janela_meta():
+    """Função chamada ao clicar no X"""
+    global aviso_meta_fechado
+    aviso_meta_fechado = True
+    root.withdraw() # Esconde imediatamente
+
+# --- GUI (TKINTER) ---
 root = tk.Tk()
-root.title("Workcam Monitor")
-# Remove bordas e barra de título (Estilo Overlay)
-root.overrideredirect(True)
-# Mantém sempre no topo
-root.attributes("-topmost", True)
-# Cor de fundo padrão
+root.title("Workcam")
+root.overrideredirect(True) # Remove borda do Windows
+root.attributes("-topmost", True) # Sempre no topo
 root.configure(bg='black')
 
-# Dimensões e Centralização da Janela
+# Dimensões
 LARGURA, ALTURA = 400, 200
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -54,9 +59,15 @@ x_c = int((screen_width/2) - (LARGURA/2))
 y_c = int((screen_height/2) - (ALTURA/2))
 root.geometry(f"{LARGURA}x{ALTURA}+{x_c}+{y_c}")
 
-# Elementos de Texto (Labels)
+# Botão X (Fechar) - Vermelho no canto superior direito
+btn_fechar = tk.Button(root, text="X", command=fechar_janela_meta, 
+                       bg="red", fg="white", font=("Arial", 10, "bold"), 
+                       bd=0, activebackground="#ff5555", activeforeground="white")
+btn_fechar.place(x=LARGURA-30, y=0, width=30, height=30)
+
+# Labels
 lbl_titulo = tk.Label(root, text="MONITORAMENTO", font=("Arial", 14), bg="black", fg="gray")
-lbl_titulo.pack(pady=10)
+lbl_titulo.pack(pady=15)
 
 lbl_tempo = tk.Label(root, text="00:00:00", font=("Arial", 35, "bold"), bg="black", fg="white")
 lbl_tempo.pack()
@@ -67,34 +78,29 @@ lbl_meta.pack(pady=5)
 lbl_status = tk.Label(root, text="Ausente", font=("Arial", 10), bg="black", fg="red")
 lbl_status.pack(pady=5)
 
-# Esconde a janela ao iniciar
 root.withdraw() 
 
-# --- INICIALIZAÇÃO DA IA ---
+# --- INICIALIZAÇÃO IA ---
 print("--- MONITOR INVISÍVEL RODANDO ---")
-print("Segure [F10] para ver o tempo.")
-print("Pressione [Ctrl+C] no terminal para encerrar.")
+print("Segure [F10] para checar.")
+print("Pressione [Ctrl+C] no terminal para sair.")
 
 net = cv2.dnn.readNetFromCaffe(ARQUIVO_PROTO, ARQUIVO_MODEL)
 cap = cv2.VideoCapture(0)
 
-# Variáveis
 ultimo_visto = time.time()
 tempo_sessao = 0
 ja_comemorou = False
-em_comemoracao = False
 
 try:
     while True:
-        # 1. ATUALIZA A GUI (Importante: sem mainloop, usamos update)
-        root.update_idletasks()
+        # 1. ATUALIZA EVENTOS DA GUI (Cliques, botões)
         root.update()
 
-        # 2. CAPTURA E DETECÇÃO (Rodando no fundo)
+        # 2. VISÃO COMPUTACIONAL
         ret, frame = cap.read()
         if not ret: break
 
-        (h, w) = frame.shape[:2]
         blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
         net.setInput(blob)
         detections = net.forward()
@@ -106,67 +112,68 @@ try:
                 rosto_encontrado = True
                 break
 
-        # 3. CONTABILIZAÇÃO
+        # 3. LÓGICA DE TEMPO
         agora = time.time()
         if rosto_encontrado: ultimo_visto = agora
         tempo_ausente = agora - ultimo_visto
         
-        meta_atingida = tempo_sessao >= META_SEGUNDOS
-
+        # Só conta se estiver dentro do buffer de segurança
         if tempo_ausente < BUFFER_SEGURANCA:
             tempo_sessao += INTERVALO_LOOP
             status_txt = "TRABALHANDO"
-            status_fg = "#00FF00" # Verde Lime
+            status_fg = "#00FF00" 
         else:
             status_txt = "AUSENTE"
-            status_fg = "#FF0000" # Vermelho
+            status_fg = "#FF0000"
 
-        # 4. LÓGICA DE EXIBIÇÃO
+        # 4. DECISÃO: MOSTRAR JANELA?
+        meta_atingida = tempo_sessao >= META_SEGUNDOS
         tecla_f10 = keyboard.is_pressed('F10')
         
-        # Formata o tempo
+        # Lógica Crucial: 
+        # Mostra se (F10 apertado) OU (Meta batida E User NÃO fechou aviso ainda)
+        deve_mostrar = tecla_f10 or (meta_atingida and not aviso_meta_fechado)
+
+        # Formatação
         hh = int(tempo_sessao // 3600)
         mm = int((tempo_sessao % 3600) // 60)
         ss = int(tempo_sessao % 60)
         str_tempo = f"{hh:02d}:{mm:02d}:{ss:02d}"
 
-        # Cenário de Vitória
-        if meta_atingida:
-            if not ja_comemorou:
-                winsound.PlaySound("SystemHand", winsound.SND_ALIAS | winsound.SND_ASYNC)
-                ja_comemorou = True
-                em_comemoracao = True
-            
-            # Muda estilo para vitória
-            root.configure(bg='#1c1c1c') # Cinza escuro elegante
-            lbl_titulo.config(text="PARABÉNS!", fg="#FFD700", bg='#1c1c1c')
-            lbl_tempo.config(text=str_tempo, fg="#FFD700", bg='#1c1c1c')
-            lbl_meta.config(text="META BATIDA!", fg="white", bg='#1c1c1c')
-            lbl_status.config(text="Você é uma máquina.", fg="white", bg='#1c1c1c')
-            
-            # Mostra a janela forçadamente
+        if deve_mostrar:
+            if meta_atingida:
+                # Comemoração
+                if not ja_comemorou:
+                    winsound.PlaySound("SystemHand", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                    ja_comemorou = True
+                
+                # Estilo Vitória
+                bg_color = '#1c1c1c'
+                fg_gold = "#FFD700"
+                root.configure(bg=bg_color)
+                lbl_titulo.config(text="PARABÉNS!", fg=fg_gold, bg=bg_color)
+                lbl_tempo.config(text=str_tempo, fg=fg_gold, bg=bg_color)
+                lbl_meta.config(text="META BATIDA!", fg="white", bg=bg_color)
+                lbl_status.config(text="Missão cumprida.", fg="white", bg=bg_color)
+            else:
+                # Estilo Normal
+                root.configure(bg='black')
+                lbl_titulo.config(text="MONITORAMENTO", fg="gray", bg="black")
+                lbl_tempo.config(text=str_tempo, fg="white", bg="black")
+                lbl_status.config(text=status_txt, fg=status_fg, bg="black")
+                lbl_meta.config(text=f"Meta: {META_HORAS}h", fg="gray", bg="black")
+
             root.deiconify()
-        
-        # Cenário Normal (F10)
-        elif tecla_f10:
-            # Atualiza textos
-            lbl_titulo.config(text="MONITORAMENTO", fg="gray", bg="black")
-            lbl_tempo.config(text=str_tempo, fg="white", bg="black")
-            lbl_status.config(text=status_txt, fg=status_fg, bg="black")
-            root.configure(bg='black')
-            
-            # Mostra janela
-            root.deiconify()
-        
-        # Esconde janela se não houver motivo para mostrar
         else:
             root.withdraw()
 
-        # Pausa para não fritar CPU
         time.sleep(INTERVALO_LOOP)
 
 except KeyboardInterrupt:
     print("\nEncerrando...")
 finally:
     cap.release()
-    root.destroy()
+    try:
+        root.destroy()
+    except:
+        pass
