@@ -5,10 +5,10 @@ import urllib.request
 import numpy as np
 import winsound
 import tkinter as tk 
-from pynput import keyboard # Trocamos a biblioteca aqui
+from pynput import keyboard 
 
 # --- CONFIGURAÇÃO ---
-META_HORAS = 6.0         
+META_HORAS = 0.002         
 BUFFER_SEGURANCA = 5.0   
 INTERVALO_LOOP = 0.5     
 CONFIANCA_MINIMA = 0.5   
@@ -28,15 +28,12 @@ janela_visivel = False
 def alternar_janela():
     global janela_visivel
     janela_visivel = not janela_visivel
-    # Bipe curto para você saber que o comando entrou sem precisar olhar
     winsound.Beep(1000, 50) 
 
 def on_press(key):
-    # Detecta o F10, mesmo vindo do LuaMacros
     if key == keyboard.Key.f10:
         alternar_janela()
 
-# Inicia o "ouvinte" em uma thread separada
 listener = keyboard.Listener(on_press=on_press)
 listener.start()
 
@@ -46,7 +43,7 @@ root.overrideredirect(True)
 root.attributes("-topmost", True) 
 root.configure(bg='black')
 
-LARGURA, ALTURA = 400, 200
+LARGURA, ALTURA = 400, 220 # Altura ajustada para caber a meta
 x_c = int((root.winfo_screenwidth()/2) - (LARGURA/2))
 y_c = int((root.winfo_screenheight()/2) - (ALTURA/2))
 root.geometry(f"{LARGURA}x{ALTURA}+{x_c}+{y_c}")
@@ -68,6 +65,10 @@ lbl_tempo.pack()
 
 lbl_status = tk.Label(root, text="Ausente", font=("Arial", 10), bg="black", fg="red")
 lbl_status.pack(pady=5)
+
+# Rótulo da Meta (Adicionado abaixo do Status)
+lbl_meta = tk.Label(root, text=f"Meta: {META_HORAS}h", font=("Arial", 12), bg="black", fg="gray")
+lbl_meta.pack(pady=5)
 
 root.withdraw() 
 
@@ -113,11 +114,31 @@ try:
                 str_tempo = f"{hh:02d}:{mm:02d}:{ss:02d}"
                 meta_atingida = tempo_sessao >= META_SEGUNDOS
 
-        # EXIBIÇÃO
+        # EXIBIÇÃO COM LÓGICA DE ESTILO
         deve_mostrar = janela_visivel or (meta_atingida and not aviso_meta_fechado)
+        
         if deve_mostrar:
-            lbl_tempo.config(text=str_tempo)
-            lbl_status.config(text=status_txt, fg=status_fg)
+            if meta_atingida:
+                # Modo Vitória (Gold)
+                if not ja_comemorou:
+                    winsound.PlaySound("SystemHand", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                    ja_comemorou = True
+                
+                bg_victory = '#1c1c1c'
+                fg_gold = "#FFD700"
+                root.configure(bg=bg_victory)
+                lbl_titulo.config(text="PARABÉNS!", fg=fg_gold, bg=bg_victory)
+                lbl_tempo.config(text=str_tempo, fg=fg_gold, bg=bg_victory)
+                lbl_status.config(text="Missão cumprida.", fg="white", bg=bg_victory)
+                lbl_meta.config(text="META BATIDA!", fg="white", bg=bg_victory)
+            else:
+                # Modo Normal
+                root.configure(bg='black')
+                lbl_titulo.config(text="MONITORAMENTO", fg="gray", bg="black")
+                lbl_tempo.config(text=str_tempo, fg="white", bg="black")
+                lbl_status.config(text=status_txt, fg=status_fg, bg="black")
+                lbl_meta.config(text=f"Meta: {META_HORAS}h", fg="gray", bg="black")
+
             root.deiconify()
         else:
             root.withdraw()
