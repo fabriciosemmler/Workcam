@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.vscode/
+# Ignorar os modelos pesados (o script baixa automaticamente)
+*.caffemodel
+*.prototxt
