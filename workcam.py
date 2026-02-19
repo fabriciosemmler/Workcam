@@ -24,18 +24,49 @@ META_SEGUNDOS = META_HORAS * 3600
 # --- VARIÁVEIS GLOBAIS ---
 aviso_meta_fechado = False  
 janela_visivel = False 
+ctrl_pressionado = False # NOVA VARIÁVEL: Rastreador do Control
 
-# --- LÓGICA DO INTERRUPTOR (TOGGLE) ---
+# --- LÓGICA DO INTERRUPTOR (TOGGLE) E RESET ---
 def alternar_janela():
     global janela_visivel
     janela_visivel = not janela_visivel
     winsound.Beep(1000, 50) 
 
-def on_press(key):
-    if key == keyboard.Key.f10:
-        alternar_janela()
+def zerar_contagem():
+    """Função cirúrgica para reiniciar o ciclo da semana"""
+    global tempo_sessao, ultimo_tempo_salvo, ja_comemorou, aviso_meta_fechado
+    tempo_sessao = 0.0
+    ultimo_tempo_salvo = 0.0
+    ja_comemorou = False
+    aviso_meta_fechado = False
+    
+    # Sobrescreve o arquivo com zero
+    with open(ARQUIVO_DADOS, "w") as f:
+        f.write("0.0")
+        
+    # Feedback sonoro duplo para confirmar o reset
+    winsound.Beep(500, 150)
+    time.sleep(0.1)
+    winsound.Beep(500, 150)
 
-listener = keyboard.Listener(on_press=on_press)
+def on_press(key):
+    global ctrl_pressionado
+    # Verifica se a tecla pressionada é o Ctrl (esquerdo ou direito)
+    if key in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+        ctrl_pressionado = True
+    elif key == keyboard.Key.f10:
+        if ctrl_pressionado:
+            zerar_contagem() # Ctrl + F10
+        else:
+            alternar_janela() # Apenas F10
+
+def on_release(key):
+    global ctrl_pressionado
+    # Quando soltar o Ctrl, desativa a flag
+    if key in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+        ctrl_pressionado = False
+
+listener = keyboard.Listener(on_press=on_press, on_release=on_release)
 listener.start()
 
 # --- GUI (TKINTER) ---
