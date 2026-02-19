@@ -160,7 +160,6 @@ try:
                 str_tempo = f"{hh:02d}:{mm:02d}:{ss:02d}"
                 meta_atingida = tempo_sessao >= META_SEGUNDOS
 
-        # EXIBIÇÃO COM LÓGICA DE ESTILO
         deve_mostrar = janela_visivel or (meta_atingida and not aviso_meta_fechado)
         
         if deve_mostrar:
