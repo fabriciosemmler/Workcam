@@ -8,7 +8,7 @@ import tkinter as tk
 from pynput import keyboard 
 
 # --- CONFIGURAÇÃO ---
-META_HORAS = 0.002         
+META_HORAS = 36.0         
 BUFFER_SEGURANCA = 5.0   
 INTERVALO_LOOP = 0.5     
 CONFIANCA_MINIMA = 0.5   
@@ -18,6 +18,7 @@ DIRETORIO_BASE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(DIRETORIO_BASE)
 ARQUIVO_PROTO = "deploy.prototxt"
 ARQUIVO_MODEL = "res10_300x300_ssd_iter_140000.caffemodel"
+ARQUIVO_DADOS = "tempo_acumulado.txt" # Arquivo que guarda o banco de horas
 META_SEGUNDOS = META_HORAS * 3600 
 
 # --- VARIÁVEIS GLOBAIS ---
@@ -77,8 +78,16 @@ net = cv2.dnn.readNetFromCaffe(ARQUIVO_PROTO, ARQUIVO_MODEL)
 cap = cv2.VideoCapture(0)
 
 ultimo_visto = time.time()
-tempo_sessao = 0
+tempo_sessao = 0.0
+
+# Carrega o banco de horas se o arquivo já existir
+if os.path.exists(ARQUIVO_DADOS):
+    with open(ARQUIVO_DADOS, "r") as f:
+        tempo_sessao = float(f.read().strip() or 0.0)
+
+ultimo_tempo_salvo = tempo_sessao # Controle para economizar gravações no disco
 ja_comemorou = False
+
 ultimo_processamento_ia = 0
 status_txt = "INICIANDO..."
 status_fg = "gray"
@@ -107,6 +116,12 @@ try:
                 if tempo_ausente < BUFFER_SEGURANCA:
                     tempo_sessao += INTERVALO_LOOP 
                     status_txt, status_fg = "TRABALHANDO", "#00FF00"
+                    
+                    # Salva no disco a cada 10s de trabalho acumulado (Econômico)
+                    if tempo_sessao - ultimo_tempo_salvo >= 10:
+                        with open(ARQUIVO_DADOS, "w") as f:
+                            f.write(str(tempo_sessao))
+                        ultimo_tempo_salvo = tempo_sessao
                 else:
                     status_txt, status_fg = "AUSENTE", "#FF0000"
 
@@ -147,5 +162,8 @@ try:
 except KeyboardInterrupt:
     pass
 finally:
+    # Salva o tempo exato antes de fechar a aplicação
+    with open(ARQUIVO_DADOS, "w") as f:
+        f.write(str(tempo_sessao))
     cap.release()
     root.destroy()
