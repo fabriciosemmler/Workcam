@@ -4,3 +4,6 @@ __pycache__/
 # Ignorar os modelos pesados (o script baixa automaticamente)
 *.caffemodel
 *.prototxt
+
+# Ignorar o arquivo de marcação de tempo
+tempo_acumulado.txt
