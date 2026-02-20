@@ -99,7 +99,7 @@ lbl_status = tk.Label(root, text="Ausente", font=("Arial", 10), bg="black", fg="
 lbl_status.pack(pady=5)
 
 # Rótulo da Meta (Adicionado abaixo do Status)
-lbl_meta = tk.Label(root, text=f"Meta: {META_HORAS}h", font=("Arial", 12), bg="black", fg="gray")
+lbl_meta = tk.Label(root, text=f"Meta: {META_HORAS}h (0.0%)", font=("Arial", 12), bg="black", fg="gray")
 lbl_meta.pack(pady=5)
 
 root.withdraw() 
@@ -159,6 +159,7 @@ try:
                 hh, mm, ss = int(tempo_sessao//3600), int((tempo_sessao%3600)//60), int(tempo_sessao%60)
                 str_tempo = f"{hh:02d}:{mm:02d}:{ss:02d}"
                 meta_atingida = tempo_sessao >= META_SEGUNDOS
+                pct_concluida = (tempo_sessao / META_SEGUNDOS) * 100
 
         deve_mostrar = janela_visivel or (meta_atingida and not aviso_meta_fechado)
         
@@ -182,7 +183,7 @@ try:
                 lbl_titulo.config(text="MONITORAMENTO", fg="gray", bg="black")
                 lbl_tempo.config(text=str_tempo, fg="white", bg="black")
                 lbl_status.config(text=status_txt, fg=status_fg, bg="black")
-                lbl_meta.config(text=f"Meta: {META_HORAS}h", fg="gray", bg="black")
+                lbl_meta.config(text=f"Meta: {META_HORAS}h ({pct_concluida:.1f}%)", fg="gray", bg="black")
 
             root.deiconify()
         else:
