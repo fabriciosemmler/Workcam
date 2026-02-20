@@ -24,7 +24,8 @@ META_SEGUNDOS = META_HORAS * 3600
 # --- VARIÁVEIS GLOBAIS ---
 aviso_meta_fechado = False  
 janela_visivel = False 
-ctrl_pressionado = False # NOVA VARIÁVEL: Rastreador do Control
+ctrl_pressionado = False 
+script_rodando = True # NOVA VARIÁVEL: Controla a execução do programa
 
 # --- LÓGICA DO INTERRUPTOR (TOGGLE) E RESET ---
 def alternar_janela():
@@ -75,16 +76,15 @@ root.overrideredirect(True)
 root.attributes("-topmost", True) 
 root.configure(bg='black')
 
-LARGURA, ALTURA = 400, 220 # Altura ajustada para caber a meta
+LARGURA, ALTURA = 400, 220 
 x_c = int((root.winfo_screenwidth()/2) - (LARGURA/2))
 y_c = int((root.winfo_screenheight()/2) - (ALTURA/2))
 root.geometry(f"{LARGURA}x{ALTURA}+{x_c}+{y_c}")
 
 def fechar_janela_meta():
-    global aviso_meta_fechado, janela_visivel
-    aviso_meta_fechado = True
-    janela_visivel = False 
-    root.withdraw() 
+    # Agora o botão X serve para encerrar o programa de forma segura
+    global script_rodando
+    script_rodando = False 
 
 btn_fechar = tk.Button(root, text="X", command=fechar_janela_meta, bg="red", fg="white", bd=0)
 btn_fechar.place(x=LARGURA-30, y=0, width=30, height=30)
@@ -98,7 +98,7 @@ lbl_tempo.pack()
 lbl_status = tk.Label(root, text="Ausente", font=("Arial", 10), bg="black", fg="red")
 lbl_status.pack(pady=5)
 
-# Rótulo da Meta (Adicionado abaixo do Status)
+# Rótulo da Meta
 lbl_meta = tk.Label(root, text=f"Meta: {META_HORAS}h (0.0%)", font=("Arial", 12), bg="black", fg="gray")
 lbl_meta.pack(pady=5)
 
@@ -116,7 +116,7 @@ if os.path.exists(ARQUIVO_DADOS):
     with open(ARQUIVO_DADOS, "r") as f:
         tempo_sessao = float(f.read().strip() or 0.0)
 
-ultimo_tempo_salvo = tempo_sessao # Controle para economizar gravações no disco
+ultimo_tempo_salvo = tempo_sessao 
 ja_comemorou = False
 
 ultimo_processamento_ia = 0
@@ -127,7 +127,8 @@ str_tempo = "00:00:00"
 print("--- MONITOR ATIVO (F10 para alternar) ---")
 
 try:
-    while True:
+    # Substituímos o True pela nossa variável de controle
+    while script_rodando:
         root.update()
         agora = time.time()
 
@@ -148,7 +149,6 @@ try:
                     tempo_sessao += INTERVALO_LOOP 
                     status_txt, status_fg = "TRABALHANDO", "#00FF00"
                     
-                    # Salva no disco a cada 10s de trabalho acumulado (Econômico)
                     if tempo_sessao - ultimo_tempo_salvo >= 10:
                         with open(ARQUIVO_DADOS, "w") as f:
                             f.write(str(tempo_sessao))
@@ -165,7 +165,6 @@ try:
         
         if deve_mostrar:
             if meta_atingida:
-                # Modo Vitória (Gold)
                 if not ja_comemorou:
                     winsound.PlaySound("SystemHand", winsound.SND_ALIAS | winsound.SND_ASYNC)
                     ja_comemorou = True
@@ -178,7 +177,6 @@ try:
                 lbl_status.config(text="Missão cumprida.", fg="white", bg=bg_victory)
                 lbl_meta.config(text="META BATIDA!", fg="white", bg=bg_victory)
             else:
-                # Modo Normal
                 root.configure(bg='black')
                 lbl_titulo.config(text="MONITORAMENTO", fg="gray", bg="black")
                 lbl_tempo.config(text=str_tempo, fg="white", bg="black")
@@ -193,7 +191,8 @@ try:
 except KeyboardInterrupt:
     pass
 finally:
-    # Salva o tempo exato antes de fechar a aplicação
+    # Ao clicar no botão vermelho (ou dar Ctrl+C), o programa cai direto aqui.
+    # Salva o tempo exato, desliga a câmera e destrói a janela para fechar o processo do Windows.
     with open(ARQUIVO_DADOS, "w") as f:
         f.write(str(tempo_sessao))
     cap.release()
